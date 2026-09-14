@@ -130,7 +130,10 @@ export class UserEditComponent {
     this.error.set(null);
 
     this.userService.updateUser(this.userId, this.formState).subscribe({
-      next: () => this.router.navigate(['/users']),
+      next: () => {
+        this.isSaving.set(false);
+        this.router.navigate(['/users']);
+      },
       error: (error) => {
         this.error.set(error.message || 'Unable to update the user.');
         this.isSaving.set(false);

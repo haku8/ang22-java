@@ -96,7 +96,10 @@ export class UserCreateComponent {
     this.error.set(null);
 
     this.userService.createUser(this.formState).subscribe({
-      next: () => this.router.navigate(['/users']),
+      next: () => {
+        this.isSaving.set(false);
+        this.router.navigate(['/users']);
+      },
       error: (error) => {
         this.error.set(error.message || 'Failed to create user.');
         this.isSaving.set(false);
