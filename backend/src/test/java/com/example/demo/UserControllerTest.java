@@ -11,9 +11,14 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -31,25 +36,80 @@ class UserControllerTest {
     private UserService userService;
 
     @Test
+    void shouldGetAllUsers() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+        List<UserDto> users = Arrays.asList(
+            new UserDto(1L, "Alice", 30, com.example.demo.model.Role.USER, now, now, true),
+            new UserDto(2L, "Bob", 25, com.example.demo.model.Role.ADMIN, now, now, true)
+        );
+        given(userService.getAllUsers()).willReturn(users);
+
+        mockMvc.perform(get("/api/users"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].user").value("Alice"))
+            .andExpect(jsonPath("$[1].user").value("Bob"));
+    }
+
+    @Test
+    void shouldGetUserById() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+        UserDto user = new UserDto(1L, "Ada", 37, com.example.demo.model.Role.USER, now, now, true);
+        given(userService.getUserById(1L)).willReturn(user);
+
+        mockMvc.perform(get("/api/users/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.user").value("Ada"))
+            .andExpect(jsonPath("$.age").value(37))
+            .andExpect(jsonPath("$.role").value("USER"));
+    }
+
+    @Test
+    void shouldReturn404_whenUserNotFound() throws Exception {
+        given(userService.getUserById(999L))
+            .willThrow(new IllegalArgumentException("User not found with id: 999"));
+
+        mockMvc.perform(get("/api/users/999"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
     void shouldCreateUser() throws Exception {
-        UserDto created = new UserDto(1L, "Ada", 37, com.example.demo.model.Role.USER, java.time.LocalDateTime.now(), java.time.LocalDateTime.now(), true);
+        LocalDateTime now = LocalDateTime.now();
+        UserDto created = new UserDto(1L, "Ada", 37, com.example.demo.model.Role.USER, now, now, true);
         given(userService.createUser(any(UserDto.class))).willReturn(created);
 
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"user\":\"Ada\",\"age\":37,\"role\":\"USER\",\"createdAt\":\"2024-01-01T10:00:00\",\"lastAccess\":\"2024-01-01T10:00:00\",\"exists\":true}"))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.user").value("Ada"));
+            .andExpect(jsonPath("$.user").value("Ada"))
+            .andExpect(jsonPath("$.age").value(37));
     }
 
     @Test
-    void shouldGetUserById() throws Exception {
-        UserDto user = new UserDto(1L, "Ada", 37, com.example.demo.model.Role.USER, java.time.LocalDateTime.now(), java.time.LocalDateTime.now(), true);
-        given(userService.getUserById(1L)).willReturn(user);
+    void shouldUpdateUser() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+        UserDto updated = new UserDto(1L, "Ada Updated", 38, com.example.demo.model.Role.ADMIN, now, now, true);
+        given(userService.updateUser(eq(1L), any(UserDto.class))).willReturn(updated);
 
-        mockMvc.perform(get("/api/users/1"))
+        mockMvc.perform(put("/api/users/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"user\":\"Ada Updated\",\"age\":38,\"role\":\"ADMIN\",\"createdAt\":\"2024-01-01T10:00:00\",\"lastAccess\":\"2024-01-01T10:00:00\",\"exists\":true}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.user").value("Ada"));
+            .andExpect(jsonPath("$.user").value("Ada Updated"))
+            .andExpect(jsonPath("$.age").value(38))
+            .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    void shouldReturn404_whenUpdatingNonExistentUser() throws Exception {
+        given(userService.updateUser(eq(999L), any(UserDto.class)))
+            .willThrow(new IllegalArgumentException("User not found with id: 999"));
+
+        mockMvc.perform(put("/api/users/999")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"user\":\"NonExistent\",\"age\":30,\"role\":\"USER\"}"))
+            .andExpect(status().isNotFound());
     }
 
     @Test
@@ -58,5 +118,14 @@ class UserControllerTest {
 
         mockMvc.perform(delete("/api/users/1"))
             .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldReturn404_whenDeletingNonExistentUser() throws Exception {
+        doThrow(new IllegalArgumentException("User not found with id: 999"))
+            .when(userService).deleteUser(999L);
+
+        mockMvc.perform(delete("/api/users/999"))
+            .andExpect(status().isNotFound());
     }
 }
